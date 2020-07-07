@@ -12,7 +12,6 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-resource_group_location = "centralus"
 prefix                  = "osdu"
 
 storage_containers = [
@@ -21,6 +20,5 @@ storage_containers = [
   "opendes"
 ]
 
-cosmos_db_name             = "dev-osdu-r3-db"
+cosmos_db_name             = "osdu-data"
 cosmosdb_consistency_level = "Session"
-cosmosdb_replica_location  = "eastus2"

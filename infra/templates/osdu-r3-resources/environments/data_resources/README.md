@@ -2,16 +2,33 @@
 
 The `osdu` - `data_resources` environment template is intended to provision to Azure resources used as part of a Data Partition. 
 
+__PreRequisites__
+
+Requires the use of [direnv](https://direnv.net/) for environment variable management.
+
 ## Deployment Steps
 
-1. Execute the following commands to set up your local environment variables:
+1. Set up your local environment variables
 
-*Note for Windows Users using WSL*: We recommend running dos2unix utility on the environment file via `dos2unix .env` prior to sourcing your environment variables to chop trailing newline and carriage return characters.
+*Note: environment variables are automatically sourced by direnv*
 
+Required Environment Variables (.envrc)
 ```bash
-# these commands setup all the environment variables needed to run this template
-DOT_ENV=<path to your .env file>
-export $(cat $DOT_ENV | xargs)
+export ARM_TENANT_ID=""           
+export ARM_SUBSCRIPTION_ID=""  
+
+# Terraform-Principal
+export ARM_CLIENT_ID=""
+export ARM_CLIENT_SECRET=""
+
+# Terraform State Storage Account Key
+export TF_VAR_remote_state_account=""
+export TF_VAR_remote_state_container=""
+export ARM_ACCESS_KEY=""
+
+# Instance Variables
+export TF_VAR_resource_group_location="centralus"
+export TF_VAR_cosmosdb_replica_location="eastus2"  # Region Pair Location
 ```
 
 2. Execute the following command to configure your local Azure CLI.
@@ -33,7 +50,7 @@ storage_containers = [
   "opendes"
 ]
 
-cosmos_db_name             = "dev-osdu-r3-db"
+cosmos_db_name             = "osdu-data"
 cosmosdb_consistency_level = "Session"
 cosmosdb_replica_location  = "eastus2"
 ```

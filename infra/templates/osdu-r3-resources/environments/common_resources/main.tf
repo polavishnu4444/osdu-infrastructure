@@ -66,15 +66,15 @@ variable "container_registry_sku" {
 #-------------------------------
 locals {
   workspace               = replace(trimspace(lower(terraform.workspace)), "-", "")
-  resource_group_name     = format("%s-%s-%s-rg", var.prefix, local.workspace, random_string.naming_scope.result)
-  container_registry_name = format("%s%s%sacr", var.prefix, local.workspace, random_string.naming_scope.result)
+  resource_group_name     = format("%s-%s-%s-rg", var.prefix, local.workspace, random_string.main.result)
+  container_registry_name = format("%s%s%sacr", var.prefix, local.workspace, random_string.main.result)
 }
 
 
 #-------------------------------
 # Common Resources  (common.tf)
 #-------------------------------
-resource "random_string" "naming_scope" {
+resource "random_string" "main" {
   keepers = {
     # Generate a new id each time we switch to a new workspace or app id
     ws_name = replace(trimspace(lower(terraform.workspace)), "-", "")
@@ -90,14 +90,14 @@ resource "random_string" "naming_scope" {
 #-------------------------------
 # Resource Group
 #-------------------------------
-resource "azurerm_resource_group" "container_rg" {
+resource "azurerm_resource_group" "main" {
   name     = local.resource_group_name
   location = var.resource_group_location
 }
 
-resource "azurerm_management_lock" "container_rg" {
-  name       = "osdu_ir_rg_lock"
-  scope      = azurerm_resource_group.storage_rg.id
+resource "azurerm_management_lock" "common_rg" {
+  name       = "osdu_common_rg_lock"
+  scope      = azurerm_resource_group.main.id
   lock_level = "CanNotDelete"
 }
 
@@ -109,7 +109,7 @@ module "container_registry" {
   source = "../../../../modules/providers/azure/container-registry"
 
   container_registry_name = local.container_registry_name
-  resource_group_name     = azurerm_resource_group.container_rg.name
+  resource_group_name     = azurerm_resource_group.main.name
 
   container_registry_sku           = var.container_registry_sku
   container_registry_admin_enabled = false

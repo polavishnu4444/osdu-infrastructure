@@ -2,16 +2,32 @@
 
 The `osdu` - `common_resources` environment template is intended to provision to Azure resources for OSDU which are typically common across multiple instances of OSDU.
 
+__PreRequisites__
+
+Requires the use of [direnv](https://direnv.net/) for environment variable management.
+
 ## Deployment Steps
 
-1. Execute the following commands to set up your local environment variables:
+1. Set up your local environment variables
 
-*Note for Windows Users using WSL*: We recommend running dos2unix utility on the environment file via `dos2unix .env` prior to sourcing your environment variables to chop trailing newline and carriage return characters.
+*Note: environment variables are automatically sourced by direnv*
 
+Required Environment Variables (.envrc)
 ```bash
-# these commands setup all the environment variables needed to run this template
-DOT_ENV=<path to your .env file>
-export $(cat $DOT_ENV | xargs)
+export ARM_TENANT_ID=""           
+export ARM_SUBSCRIPTION_ID=""  
+
+# Terraform-Principal
+export ARM_CLIENT_ID=""
+export ARM_CLIENT_SECRET=""
+
+# Terraform State Storage Account Key
+export TF_VAR_remote_state_account=""
+export TF_VAR_remote_state_container=""
+export ARM_ACCESS_KEY=""
+
+# Instance Variables
+export TF_VAR_resource_group_location="southcentralus"
 ```
 
 2.Execute the following command to configure your local Azure CLI.
@@ -24,9 +40,7 @@ az login --service-principal -u $ARM_CLIENT_ID -p $ARM_CLIENT_SECRET --tenant $A
 3.Navigate to the `terraform.tfvars` terraform file. Here's a sample of the terraform.tfvars file for this template.
 
 ```HCL
-resource_group_name     = "osdu-r2-acr"
-resource_group_location = "centralus"
-container_registry_name = "osducr"
+prefix                  = "osdu"
 ```
 
 4.Execute the following commands to set up your terraform workspace.
@@ -38,7 +52,7 @@ terraform init -backend-config "storage_account_name=${TF_VAR_remote_state_accou
 
 # This command configures terraform to use a workspace unique to you. This allows you to work
 # without stepping over your teammate's deployments
-TF_WORKSPACE="${USER}-cc"
+TF_WORKSPACE="${USER}-cr"
 terraform workspace new $TF_WORKSPACE || terraform workspace select $TF_WORKSPACE
 ```
 
