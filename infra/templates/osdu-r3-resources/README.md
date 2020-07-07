@@ -1,4 +1,4 @@
-# Azure OSDU AKS Architecture Solution
+# Azure OSDU AKS Architecture Solution with Elastic Cloud SaaS
 
 The `osdu` - Kubernetes Architecture solution template is intended to provision Managed Kubernetes resources like AKS and other core OSDU cloud managed services like Cosmos, Blob Storage and Keyvault. 
 
