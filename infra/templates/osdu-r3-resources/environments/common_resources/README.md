@@ -1,37 +1,6 @@
-# Azure OSDU R3 - Image Registry Environment
+# Azure OSDU R3 - Common Resources Environment
 
-The `osdu` - `image_registry` environment template is intended to provision Azure the Azure Container Registry resource. The configuration is split into seperate templates for the following reasons.
- - Mitigate the risk of Terraform accidentally deleting stateful resources types 
- - The ACR resource is referenced across all Azure environment resources provisioned through the `container_cluster` and `managed_service` environments.
-
-## Technical Design
-
-Template design [specifications](../../docs/design/README.md).
-
-## Architecture
-
-![Template Topology](../../docs/design/.design_images/deployment_topology.jpg "Template Topology")
-
-![Infrastructure Architecture](../../docs/design/.design_images/deployment_topology.jpg "Template Topology")
-
-## Intended audience
-
-Cloud administrators that's versed with Cobalt templating.
-
-## Prerequisites
-
-1. Azure Subscription
-2. An available Service Principal with API Permissions granted with Admin Consent within Azure app registration. The required Azure Active Directory Graph app role is `Application.ReadWrite.OwnedBy`
-![image](https://user-images.githubusercontent.com/7635865/74204636-9d0dde00-4c39-11ea-9943-2dd32bcd3322.png)
-3. Terraform and Go are locally installed
-4. Azure Storage Account is [setup](https://docs.microsoft.com/en-us/azure/terraform/terraform-backend) to store Terraform state
-5. Local environment variables are [setup](https://github.com/microsoft/cobalt/blob/f31aff95e7732efde96c91b2779e94e16c1d538e/docs/2_QUICK_START_GUIDE.md#step-3-setup-local-environment-variables)
-6. Deployment Service Principal is granted Owner level role assignment for the target Azure subscription
-![image](https://user-images.githubusercontent.com/7635865/74204526-2ec91b80-4c39-11ea-8b1b-e5f1a61b473c.png)
-
-## Cost
-
-Azure environment cost ballpark [estimate](https://azure.com/e/92b05a7cd1e646368ab74772e3122500). This is subject to change and is driven from the resource pricing tiers configured when the template is deployed.
+The `osdu` - `common_resources` environment template is intended to provision to Azure resources for OSDU which are typically common across multiple instances of OSDU.
 
 ## Deployment Steps
 
@@ -84,6 +53,23 @@ terraform apply
 ```
 
 6.Optionally execute the following command to teardown your deployment and delete your resources.
+
+```bash
+# Destroy resources and tear down deployment. Only do this if you want to destroy your deployment.
+terraform destroy
+```
+
+## Integration Testing
+
+Please confirm that you've completed the `terraform apply` step before running the integration tests as we're validating the active terraform workspace.
+
+Integration tests can be run using the following command:
+
+```
+go test -v $(go list ./... | grep "integration")
+```
+
+6. Optionally execute the following command to teardown your deployment and delete your resources.
 
 ```bash
 # Destroy resources and tear down deployment. Only do this if you want to destroy your deployment.

@@ -95,6 +95,12 @@ resource "azurerm_resource_group" "container_rg" {
   location = var.resource_group_location
 }
 
+resource "azurerm_management_lock" "container_rg" {
+  name       = "osdu_ir_rg_lock"
+  scope      = azurerm_resource_group.storage_rg.id
+  lock_level = "CanNotDelete"
+}
+
 
 #-------------------------------
 # Container Registry

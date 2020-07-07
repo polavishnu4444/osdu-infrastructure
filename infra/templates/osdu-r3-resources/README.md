@@ -1,23 +1,27 @@
-# Azure SDMS - Container Environment
+# Azure OSDU AKS Architecture Solution
 
-The `sdms` - `container_cluster` environment template is intended to provision Managed Kubernetes resources like AKS and other core SDMS cloud managed services like Cosmos, Blob Storage and Keyvault. We decided to split these configuration files out into a separate Terraform module to mitigate the risk of Terraform accidentally deleting stateful resources types.
+The `osdu` - Kubernetes Architecture solution template is intended to provision Managed Kubernetes resources like AKS and other core OSDU cloud managed services like Cosmos, Blob Storage and Keyvault. 
 
+We decided to split these configuration files out into a separate Terraform environment templates to mitigate the risk of Terraform accidentally deleting stateful resources types as well as have a mechanism to duplicate environments to support concepts such as data partitioning or multiple AKS Clusters.
 
 
 ## Technical Design
-Template design [specifications](../../docs/design/aks-environment.md).
+Technical design [specifications](docs/aks-environment.md)
+
+## GitOps Design
+GitOps design [specifications](../../../docs/GITOPS_DESIGN.md).
 
 ## Cloud Resource Architecture
 
-![Topology](./docs/architecture.png "Architecture")
+![Architecture](./docs/images/architecture.png "Architecture")
 
 ## Resource Topology
 
-![Resource Topology](./docs/topology.png "Resource Topology")
+![Resource Topology](./docs/images/topology.png "Resource Topology")
 
 ## Terraform Template Topology
 
-![Template Topology](./docs/template.png "Template Topology")
+![Template Topology](./docs/images/template.png "Terraform Template Topology")
 
 ## Intended audience
 
@@ -27,15 +31,15 @@ Cloud administrators who are versed with both Cobalt templating and Kubernetes.
 
 1. Azure Subscription
 1. An available Service Principal with API Permissions granted with Admin Consent within Azure app registration. The required Azure Active Directory Graph app role is `Application.ReadWrite.OwnedBy`
-![image](https://user-images.githubusercontent.com/7635865/74204636-9d0dde00-4c39-11ea-9943-2dd32bcd3322.png)
+![image](../../../docs/images/service_principal_permissions.png)
 1. Terraform and Go are locally installed
 1. Azure Storage Account is [setup](https://docs.microsoft.com/en-us/azure/terraform/terraform-backend) to store Terraform state
 1. Local environment variables are [setup](https://github.com/microsoft/cobalt/blob/f31aff95e7732efde96c91b2779e94e16c1d538e/docs/2_QUICK_START_GUIDE.md#step-3-setup-local-environment-variables)
 1. Deployment Service Principal is granted Owner level role assignment for the target Azure subscription
-![image](https://user-images.githubusercontent.com/7635865/74204526-2ec91b80-4c39-11ea-8b1b-e5f1a61b473c.png)
+![image](../../../docs/images/service_principal.png)
 1. Enroll as an Azure subscriber. The free trial subscription does not support enough cores to run this tutorial.
-1. Terraform `image_registry` environment module is [provisoned](../image_registry/README.md) to your Azure Environment
-1. Terraform `data_sources` environment module is [provisoned](../data_sources/README.md) to your Azure Environment
+1. Terraform `common_resources` environment module is [provisoned](../common_resources/README.md) to your Azure Environment
+1. Terraform `data_resources` environment module is [provisoned](../data_resources/README.md) to your Azure Environment
 1. Install the required common tools (kubectl, helm, and terraform). See also [Required Tools](https://github.com/microsoft/bedrock/tree/master/cluster). Note: this tutorial currently uses [Terraform 0.12.6](https://releases.hashicorp.com/terraform/0.12.6/).
 
 ### Install the required tooling
@@ -146,130 +150,27 @@ The key's randomart image is:
 Update your `.env` file with the paths to your public and private SSH keys for Node and GitOPS repo access.
 
 ```
-TF_VAR_ssh_public_key_file=/home/erikschlegel/.ssh/node-ssh-key.pub
-TF_VAR_gitops_ssh_key_file=/home/erikschlegel/.ssh/gitops-ssh-key
+TF_VAR_ssh_public_key_file=/home/$USER/.ssh/node-ssh-key.pub
+TF_VAR_gitops_ssh_key_file=/home/$USER/.ssh/gitops-ssh-key
 ```
 
 # Deployment Steps
 
-## Source your environment 
+## Deploy Common Resources
 
-Execute the following commands to set up your local environment variables:
+Follow the directions in the `common_resources` environment [README](./environments/common_resources/README.md).
 
-*Note for Windows Users using WSL*: We recommend running dos2unix utility on the environment file via `dos2unix .env` prior to sourcing your environment variables to chop trailing newline and carriage return characters.
+## Deploy Data Resources
 
-```bash
-# these commands setup all the environment variables needed to run this template
-DOT_ENV=<path to your .env file>
-export $(cat $DOT_ENV | xargs)
-```
+Follow the directions in the `data_resources` environment [README](./environments/data_resources/README.md).
 
-## Service Principal Login
+## Deploy Data Resources
 
-Execute the following command to configure your local Azure CLI.
-
-```bash
-# This logs your local Azure CLI in using the configured service principal.
-az login --service-principal -u $ARM_CLIENT_ID -p $ARM_CLIENT_SECRET --tenant $ARM_TENANT_ID
-```
-
-## Define Terraform Variables
-
-Navigate to the `terraform.tfvars` terraform file. Here's a sample of the terraform.tfvars file for this template. Be sure to update the `gitops_ssh_url` TF var with the git url of the GitOPS repo.
-![image](https://user-images.githubusercontent.com/7635865/74342523-37bc0900-4d6f-11ea-810f-9a860eaf7677.png)
-
-
-```HCL
-resource_group_location     = "centralus"
-prefix                      = "osdu-r2"
-acr_resource_group_name     = "osdu-r2-acr"
-acr_container_registry_name = "osducr"
-data_resource_prefix        = "data-dev-int-osdur2"
-gitops_ssh_url              = "git@ssh.dev.azure.com:v3/slb-des-ext-collaboration/open-data-ecosystem/k8-gitops-hld"
-sb_topics = []
-```
-
-## Initialize your workspace
-
-Execute the following commands to set up your terraform workspace.
-
-```bash
-# This configures terraform to leverage a remote backend that will help you and your
-# team keep consistent state
-terraform init -backend-config "storage_account_name=${TF_VAR_remote_state_account}" -backend-config "container_name=${TF_VAR_remote_state_container}"
-
-# This command configures terraform to use a workspace unique to you. This allows you to work
-# without stepping over your teammate's deployments
-TF_WORKSPACE="dev-int-aks"
-terraform workspace new $TF_WORKSPACE || terraform workspace select $TF_WORKSPACE
-```
-
-## Terraform Plan
-
-Next, execute terraform plan and specify the location of our variables file. Terraform looks for `terraform.tfvars` in the current directory as a default.
-
-```bash
-# See what terraform will try to deploy without actually deploying
-terraform plan
-```
-
-## Terraform Apply
-
-The final step is to issue terraform apply which uses the file containing the variables we defined above (if you run terraform apply without -var-file= it will take any *.tfvars file in the folder, for example, the sample terraform.tfvars file, if you didn't remove it, and start asking for the unspecified fields).
-
-```bash
-# Execute a deployment
-terraform apply
-```
-
-## Terraform State
-
-1. The results of terraform apply are enumerated in the terraform.tfstate file. For an overview of resources created, run terraform state list:
-```bash
-$ terraform state list
-data.azurerm_client_config.current
-data.azurerm_container_registry.container_registry
-data.azurerm_cosmosdb_account.cosmosdb_account
-data.azurerm_redis_cache.cache
-data.azurerm_storage_account.data_storage
-data.azurerm_subnet.vnet
-data.local_file.node_public_ssh
-azurerm_resource_group.aks_rg
-azurerm_role_assignment.aks_group
-azurerm_role_assignment.service_bus_roles[0]
-```
-
-To see all the details, run terraform show
-
-To see one element, for example, run terraform state show module.vnet.azurerm_virtual_network.vnet:
-
-```bash
-$ terraform state show module.vnet.azurerm_virtual_network.vnet
-# module.vnet.azurerm_virtual_network.vnet:
-resource "azurerm_virtual_network" "vnet" {
-    address_space       = [
-        "10.10.0.0/16",
-    ]
-    dns_servers         = []
-    id                  = "/subscriptions/929e9uu0-7bb1-xxxx-xxxxx-xxxxx/resourceGroups/devint-aks-mgf9wjxt-osdu-r2-aks-rg/providers/Microsoft.Network/virtualNetworks/devint-aks-mgf9wjxt-osdu-r2-vnet"
-    location            = "centralus"
-    name                = "devint-aks-mgf9wjxt-osdu-r2-vnet"
-    resource_group_name = "devint-aks-mgf9wjxt-osdu-r2-aks-rg"
-    tags                = {
-        "environment" = "container_cluster"
-    }
-
-    subnet {
-        address_prefix = "10.10.1.0/24"
-        id             = "/subscriptions/929e9uu0-xxxx-xxxxx-xxxxx/resourceGroups/devint-aks-mgf9wjxt-osdu-r2-aks-rg/providers/Microsoft.Network/virtualNetworks/devint-aks-mgf9wjxt-osdu-r2-vnet/subnets/devint-aks-mgf9wjxt-osdu-r2-aks-aks-subnet"
-        name           = "devint-aks-mgf9wjxt-osdu-r2-aks-aks-subnet"
-    }
-}
-```
+Follow the directions in the `cluster_resources` environment [README](./environments/cluster_resources/README.md).
 
 ## Interact with the Deployed Cluster
 
-After `terraform apply` finishes, there is one critical output artifact: the Kubernetes config file for the deployed cluster that is generated and saved in the output directory. The default file is output/bedrock_kube_config. The following steps use this file to interact with the deployed Bedrock AKS cluster.
+After `terraform apply` finishes for the cluster_resources, there is one critical output artifact: the Kubernetes config file for the deployed cluster that is generated and saved in the output directory. The default file is output/bedrock_kube_config. The following steps use this file to interact with the deployed Bedrock AKS cluster.
 
 Using the config file output/bedrock_kube_config, one of the first things we can do is list all pods deployed within the cluster:
 
