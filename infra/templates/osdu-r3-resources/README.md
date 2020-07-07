@@ -40,17 +40,17 @@ Cloud administrators who are versed with both Cobalt templating and Kubernetes.
 1. Enroll as an Azure subscriber. The free trial subscription does not support enough cores to run this tutorial.
 1. Terraform `common_resources` environment module is [provisoned](environments/common_resources/README.md) to your Azure Environment
 1. Terraform `data_resources` environment module is [provisoned](environments/data_resources/README.md) to your Azure Environment
-1. Install the required common tools (kubectl, helm, and terraform). See also [Required Tools](https://github.com/microsoft/bedrock/tree/master/cluster). Note: this tutorial currently uses [Terraform 0.12.6](https://releases.hashicorp.com/terraform/0.12.6/).
+1. Install the required common tools (kubectl, helm, and terraform). See also [Required Tools](https://github.com/microsoft/bedrock/tree/master/cluster). Note: this tutorial currently uses [Terraform 0.12.28](https://releases.hashicorp.com/terraform/0.12.28/).
 
 ### Install the required tooling
 
 This document assumes one is running a current version of Ubuntu. Windows users can install the [Ubuntu Terminal](https://www.microsoft.com/store/productId/9NBLGGH4MSV6) from the Microsoft Store. The Ubuntu Terminal enables Linux command-line utilities, including bash, ssh, and git that will be useful for the following deployment. _Note: You will need the Windows Subsystem for Linux installed to use the Ubuntu Terminal on Windows_.
 
-Ensure that the [required tools](https://github.com/microsoft/bedrock/tree/master/cluster#required-tools), are installed in your environment. Alternatively, there are [scripts](https://github.com/jmspring/bedrock-dev-env/tree/master/scripts) that will install `helm`, `terraform` and `kubectl`. In this case, use `setup_kubernetes_tools.sh` and `setup_terraform.sh`. The scripts install the tools into `/usr/local/bin`.
+Ensure that the [required tools](https://github.com/microsoft/bedrock/tree/master/cluster#required-tools), are installed in your environment. Alternatively, there are [scripts](https://github.com/microsoft/bedrock/tree/master/tools/prereqs) that will install `helm`, `terraform` and `kubectl`. In this case, use `setup_kubernetes_tools.sh` and `setup_terraform.sh`. The scripts install the tools into `/usr/local/bin`.
 
 ### Install the Azure CLI
 
-For information specific to your operating system, see the [Azure CLI install guide](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest). You can also use [this script](https://github.com/jmspring/bedrock-dev-env/blob/master/scripts/setup_azure_cli.sh) if running on a Unix based machine.
+For information specific to your operating system, see the [Azure CLI install guide](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest). You can also use [this script](https://github.com/microsoft/bedrock/blob/master/tools/prereqs/setup_azure_cli.sh) if running on a Unix based machine.
 
 
 # Set Up Flux Manifest Repository
@@ -158,15 +158,15 @@ TF_VAR_gitops_ssh_key_file=/home/$USER/.ssh/gitops-ssh-key
 
 ## Deploy Common Resources
 
-Follow the directions in the `common_resources` environment [README](./environments/common_resources/README.md).
+Follow the directions in the [`common_resources`](./environments/common_resources/README.md) environment.
 
 ## Deploy Data Resources
 
-Follow the directions in the `data_resources` environment [README](./environments/data_resources/README.md).
+Follow the directions in the [`data_resources`](/environments/data_resources/README.md) environment.
 
 ## Deploy Data Resources
 
-Follow the directions in the `cluster_resources` environment [README](./environments/cluster_resources/README.md).
+Follow the directions in the [`cluster_resources`](./environments/cluster_resources/README.md) environment.
 
 ## Interact with the Deployed Cluster
 
