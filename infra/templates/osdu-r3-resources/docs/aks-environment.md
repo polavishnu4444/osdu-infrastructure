@@ -41,19 +41,19 @@ This document outlines how Cobalt has been extended to meet the use cases of the
 
 This drawing shows the intended Azure Solution Architecture necessary.
 
-![Architecture](./docs/images/architecture.png "Architecture")
+![Architecture](images/architecture.png "Architecture")
 
 ## Deployment Topology
 
 This graphic shows the targeted deployment topology needed by our enterprise customers. The deployment is deployed to a single tenant and subscription. The resources are partitioned to align with the different personas within the customer.
 
-![Deployment Topology](docs/images/topology.png "Deployment Topology")
+![Deployment Topology](images/topology.png "Deployment Topology")
 
 ## Template Topology
 
 The graphic below outlines the topology of the terraform templates that will deploy the topology called out above.
 
-![Template Topology](docs/template.png "Template Topology")
+![Template Topology](images/template.png "Template Topology")
 
 ## Terraform Template Environment Dependencies
 
