@@ -57,6 +57,12 @@ variable "prefix" {
   type        = string
 }
 
+variable "randomization_level" {
+  description = "Number of additional random characters to include in resource names to insulate against unexpected resource name collisions."
+  type        = number
+  default     = 4
+}
+
 variable "resource_group_location" {
   description = "The Azure region where data storage resources in this template should be created."
   type        = string
@@ -95,25 +101,35 @@ variable "cosmosdb_automatic_failover" {
 #-------------------------------
 locals {
   // sanitize names
-  resource_prefix = replace(format("%s-%s", trimspace(lower(terraform.workspace)), random_string.main.result), "_", "-")
-  workspace       = replace(trimspace(lower(terraform.workspace)), "-", "")
-  resource_group_name     = format("%s-%s-%s-rg", var.prefix, local.workspace, random_string.main.result)
-  storage_name    = "${replace(local.resource_prefix, "-", "")}sa" // storage account
-  cosmosdb_name   = "${local.resource_prefix}-cosmosdb"            // cosmosdb account (max 44 chars )  
+  prefix = replace(trimspace(lower(var.prefix)), "_", "-")
+  workspace  = replace(trimspace(lower(terraform.workspace)), "-", "")
+  suffix     = var.randomization_level > 0 ? "-${random_string.workspace_scope.result}" : ""
+
+  // base prefix for resources, prefix constraints documented here: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions
+  base_name    = length(local.prefix) > 0 ? "${local.prefix}-${local.workspace}${local.suffix}" : "${local.workspace}${local.suffix}"
+  base_name_21 = length(local.base_name) < 22 ? local.base_name : "${substr(local.base_name, 0, 21 - length(local.suffix))}${local.suffix}"
+  base_name_46 = length(local.base_name) < 47 ? local.base_name : "${substr(local.base_name, 0, 46 - length(local.suffix))}${local.suffix}"
+  base_name_60 = length(local.base_name) < 61 ? local.base_name : "${substr(local.base_name, 0, 60 - length(local.suffix))}${local.suffix}"
+  base_name_76 = length(local.base_name) < 77 ? local.base_name : "${substr(local.base_name, 0, 76 - length(local.suffix))}${local.suffix}"
+  base_name_83 = length(local.base_name) < 84 ? local.base_name : "${substr(local.base_name, 0, 83 - length(local.suffix))}${local.suffix}"
+
+  resource_group_name     = format("%s-%s-%s-rg", var.prefix, local.workspace, random_string.workspace_scope.result)
+  storage_name = "${replace(local.base_name_21, "-", "")}sa"
+  cosmosdb_name   = "${local.base_name}-db"
 }
 
 
 #-------------------------------
 # Common Resources  (common.tf)
 #-------------------------------
-resource "random_string" "main" {
+resource "random_string" "workspace_scope" {
   keepers = {
     # Generate a new id each time we switch to a new workspace or app id
     ws_name = replace(trimspace(lower(terraform.workspace)), "-", "")
     prefix  = replace(trimspace(lower(var.prefix)), "_", "-")
   }
 
-  length  = 4
+  length  = max(1, var.randomization_level) // error for zero-length
   special = false
   upper   = false
 }
@@ -181,28 +197,12 @@ output "resource_group_name" {
   value       = azurerm_resource_group.main.name
 }
 
-output "storage_account" {
-  description = "The name of the storage account."
-  value       = module.storage_account.name
-}
-
-output "storage_account_id" {
-  description = "The resource identifier of the storage account."
-  value       = module.storage_account.id
-}
-
-output "storage_account_containers" {
-  description = "Map of storage account containers."
-  value       = module.storage_account.containers
+output "storage_properties" {
+  description = "Properties of the deployed Storage Account."
+  value       = module.storage_account.properties
 }
 
 output "cosmosdb_properties" {
   description = "Properties of the deployed CosmosDB account."
   value       = module.cosmosdb_account.properties
 }
-
-output "cosmosdb_account_name" {
-  description = "The name of the CosmosDB account."
-  value       = module.cosmosdb_account.account_name
-}
-

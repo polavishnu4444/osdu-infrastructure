@@ -12,65 +12,139 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-resource "random_id" "entitlement_key" {
-  byte_length = 18
-}
-
-module "keyvault" {
-  source              = "../../../../modules/providers/azure/keyvault"
-  keyvault_name       = local.kv_name
-  resource_group_name = azurerm_resource_group.aks_rg.name
-}
-
-module "aks_keyvault_ssl_cert_import" {
-  source                         = "../../../../modules/providers/azure/keyvault-cert"
-  key_vault_cert_import_filepath = var.ssl_certificate_file
-  keyvault_id                    = module.keyvault.keyvault_id
-  key_vault_cert_name            = "appgw-ssl-cert"
-}
-
-module "aks_msi_keyvault_access_policy" {
-  source    = "../../../../modules/providers/azure/keyvault-policy"
-  vault_id  = module.keyvault.keyvault_id
-  tenant_id = local.tenant_id
-  object_ids = [
-    module.app_management_service_principal.service_principal_object_id
-  ]
-  key_permissions         = ["get", "list"]
-  secret_permissions      = ["get", "list"]
-  certificate_permissions = ["get", "list", "import"]
-}
-
 locals {
   secrets_map = {
     # AAD Application Secrets
-    aad-client-id = module.ad_application.azuread_app_ids[0]
+    # aad-client-id = module.ad_application.id
+
     # App Insights Secrets
-    appinsights-key = module.app_insights.app_insights_instrumentation_key
+    # appinsights-key = module.app_insights.app_insights_instrumentation_key
+
     # Service Bus Namespace Secrets
-    sb-connection = module.service_bus.service_bus_namespace_default_connection_string
+    # sb-connection = module.service_bus.service_bus_namespace_default_connection_string
+
     # Elastic Search Cluster Secrets
-    elastic-endpoint = data.terraform_remote_state.data_sources.outputs.elastic_cluster_properties.elastic_search.endpoint
-    elastic-username = data.terraform_remote_state.data_sources.outputs.elastic_cluster_properties.elastic_search.username
-    elastic-password = data.terraform_remote_state.data_sources.outputs.elastic_cluster_properties.elastic_search.password
+    # elastic-endpoint = var.elasticsearch_endpoint
+    # elastic-username = var.elasticsearch_username
+    # elastic-password = var.elasticsearch_password
+
     # Cosmos Cluster Secrets
-    cosmos-endpoint    = data.terraform_remote_state.data_sources.outputs.cosmosdb_properties.cosmosdb.endpoint
-    cosmos-primary-key = data.terraform_remote_state.data_sources.outputs.cosmosdb_properties.cosmosdb.primary_master_key
-    cosmos-connection  = data.terraform_remote_state.data_sources.outputs.cosmosdb_properties.cosmosdb.connection_strings[0]
-    # App Service Auth Related Secrets
-    entitlement-key = random_id.entitlement_key.hex
+    cosmos-endpoint    = data.terraform_remote_state.data_resources.outputs.cosmosdb_properties.cosmosdb.endpoint
+    cosmos-primary-key = data.terraform_remote_state.data_resources.outputs.cosmosdb_properties.cosmosdb.primary_master_key
+    cosmos-connection  = data.terraform_remote_state.data_resources.outputs.cosmosdb_properties.cosmosdb.connection_strings[0]
+
+    # Storage Account Secrets
+    storage-account-key = data.terraform_remote_state.data_resources.outputs.storage_properties.primary_access_key
+
     # Service Principal Secrets
-    app-dev-sp-username  = module.app_management_service_principal.service_principal_application_id
-    app-dev-sp-password  = module.app_management_service_principal.service_principal_password
-    app-dev-sp-tenant-id = data.azurerm_client_config.current.tenant_id
+    # app-dev-sp-username  = module.app_management_service_principal.client_id
+    # app-dev-sp-password  = module.app_management_service_principal.client_secret
+    # app-dev-sp-tenant-id = data.azurerm_client_config.current.tenant_id
+
     # App Gateway AAD Pod Identity Secrets
-    aks-app-gw-msi-client-id   = module.aks-gitops.kubelet_client_id
-    aks-app-gw-msi-resource-id = module.aks-gitops.kubelet_resource_id
+    # aks-app-gw-msi-client-id   = module.aks-gitops.kubelet_client_id
+    # aks-app-gw-msi-resource-id = module.aks-gitops.kubelet_resource_id
+
   }
 
   output_secret_map = {
     for secret in module.keyvault_secrets.keyvault_secret_attributes :
     secret.name => secret.id
+  }
+}
+
+
+#-------------------------------
+# Key Vault
+#-------------------------------
+module "keyvault" {
+  source              = "../../../../modules/providers/azure/keyvault"
+  keyvault_name       = local.kv_name
+  resource_group_name = local.resource_group_name
+}
+
+resource "azurerm_key_vault_certificate" "import" {
+  count = var.ssl_certificate_file == "" ? 0 : 1
+
+  name         = local.ssl_cert_name
+  key_vault_id = module.keyvault.keyvault_id
+
+  certificate {
+    contents = filebase64(var.ssl_certificate_file)
+  }
+
+  certificate_policy {
+    issuer_parameters {
+      name = "Self"
+    }
+
+    key_properties {
+      exportable = true
+      key_size   = 4096
+      key_type   = "RSA"
+      reuse_key  = false
+    }
+
+    secret_properties {
+      content_type = "application/x-pkcs12" #application/x-pkcs12 for PFX or application/x-pem-file for PEM
+    }
+  }
+}
+
+# If no cert is provided then install a default one.
+resource "azurerm_key_vault_certificate" "default" {
+  count = var.ssl_certificate_file == "" ? 1 : 0
+
+  name         = local.ssl_cert_name
+  key_vault_id = module.keyvault.keyvault_id
+
+  certificate_policy {
+    issuer_parameters {
+      name = "Self"
+    }
+
+    key_properties {
+      exportable = true
+      key_size   = 2048
+      key_type   = "RSA"
+      reuse_key  = true
+    }
+
+    lifetime_action {
+      action {
+        action_type = "AutoRenew"
+      }
+
+      trigger {
+        days_before_expiry = 30
+      }
+    }
+
+    secret_properties {
+      content_type = "application/x-pkcs12"
+    }
+
+    x509_certificate_properties {
+      # Server Authentication = 1.3.6.1.5.5.7.3.1
+      # Client Authentication = 1.3.6.1.5.5.7.3.2
+      extended_key_usage = ["1.3.6.1.5.5.7.3.1"]
+
+      key_usage = [
+        "cRLSign",
+        "dataEncipherment",
+        "digitalSignature",
+        "keyAgreement",
+        "keyCertSign",
+        "keyEncipherment",
+      ]
+
+      subject_alternative_names {
+        dns_names = [var.dns_name, "${local.base_name}-gw.${var.resource_group_location}.cloudapp.azure.com"]
+      }
+
+      subject            = "CN=*.contoso.com"
+      validity_in_months = 12
+    }
   }
 }
 

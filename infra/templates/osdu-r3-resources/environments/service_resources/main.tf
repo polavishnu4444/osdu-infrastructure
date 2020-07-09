@@ -13,13 +13,6 @@
 //  limitations under the License.
 
 
-/*
-.Synopsis
-   Terraform Main Control
-.DESCRIPTION
-   This file holds the main control and resoures for bootstraping an OSDU Azure Devops Project.
-*/
-
 terraform {
   required_version = ">= 0.12"
   backend "azurerm" {
@@ -32,38 +25,20 @@ terraform {
 # Providers
 #-------------------------------
 provider "azurerm" {
-  version = "=2.16.0"
+  version = "~> 2.8.0"
   features {}
 }
 
-provider "random" {
-  version = "~>2.2"
+provider "null" {
+  version = "~>2.1.0"
 }
 
-
-#-------------------------------
-# Application Variables  (variables.tf)
-#-------------------------------
-variable "prefix" {
-  description = "(Required) An identifier used to construct the names of all resources in this template."
-  type        = string
+provider "azuread" {
+  version = "~>0.7.0"
 }
 
-variable "randomization_level" {
-  description = "Number of additional random characters to include in resource names to insulate against unexpected resource name collisions."
-  type        = number
-  default     = 4
-}
-
-variable "resource_group_location" {
-  description = "The Azure region where container registry resources in this template should be created."
-  type        = string
-}
-
-variable "container_registry_sku" {
-  description = "(Optional) The SKU name of the the container registry. Possible values are Basic, Standard and Premium."
-  type        = string
-  default     = "Standard"
+provider "external" {
+  version = "~> 1.0"
 }
 
 
@@ -84,19 +59,74 @@ locals {
   base_name_76 = length(local.base_name) < 77 ? local.base_name : "${substr(local.base_name, 0, 76 - length(local.suffix))}${local.suffix}"
   base_name_83 = length(local.base_name) < 84 ? local.base_name : "${substr(local.base_name, 0, 83 - length(local.suffix))}${local.suffix}"
 
+  tenant_id               = data.azurerm_client_config.current.tenant_id
   resource_group_name     = format("%s-%s-%s-rg", var.prefix, local.workspace, random_string.workspace_scope.result)
-  container_registry_name = "${replace(local.base_name_21, "-", "")}cr"
+
+  // keyvault.tf
+  kv_name                = "${local.base_name_21}-kv"
+  ssl_cert_name          = "appgw-ssl-cert"
+
+  // network.tf
+  vnet_name              = "${local.base_name_60}-vnet"
+  fe_subnet_name         = "${local.base_name_21}-fe-subnet"
+  aks_subnet_name        = "${local.base_name_21}-aks-subnet"
+  be_subnet_name         = "${local.base_name_21}-be-subnet"
+  app_gw_name            = "${local.base_name_60}-gw"
+
+  # aks_cluster_name       = "${local.base_name_21}-aks"
+  # aks_dns_prefix         = local.base_name_60
+
+  # aks_rg_name            = "${local.base_name_21}-aks-rg"
+  # app_gw_identity_name   = "${local.base_name_21}-app-gw-identity"
+   
+  # app_gw_name            = "${local.base_name_60}-appgw"
+  
+  # agic_identity_name     = "${local.aks_cluster_name}-agic-identity"
+  # pod_identity_name      = "${local.aks_cluster_name}-pod-identity"
+  # sdmspod_identity_name  = "${local.aks_cluster_name}-sdmspod-identity"
+
+  # ad_app_management_name = "${local.base_name}-ad-app-management"
+  # ad_app_name            = "${local.base_name}-ad-app"            // service principal
+  # graph_id               = "00000003-0000-0000-c000-000000000000" // ID for Microsoft Graph API
+  # graph_role_id          = "e1fe6dd8-ba31-4d61-89e7-88639da4683d" // ID for User.Read API
+  # helm_pod_identity_ns   = "podidentity"
+  # helm_agic_ns           = "agic"
+  # helm_agic_name         = "agic"
+  # helm_pod_identity_name = "aad-pod-identity"
 }
 
 
 #-------------------------------
 # Common Resources  (common.tf)
 #-------------------------------
+
+data "azurerm_client_config" "current" {}
+
+data "terraform_remote_state" "data_resources" {
+  backend = "azurerm"
+
+  config = {
+    storage_account_name = var.remote_state_account
+    container_name       = var.remote_state_container
+    key                  = format("terraform.tfstateenv:%s", var.data_resources_workspace_name)
+  }
+}
+
+data "terraform_remote_state" "common_resources" {
+  backend = "azurerm"
+
+  config = {
+    storage_account_name = var.remote_state_account
+    container_name       = var.remote_state_container
+    key                  = format("terraform.tfstateenv:%s", var.common_resources_workspace_name)
+  }
+}
+
 resource "random_string" "workspace_scope" {
   keepers = {
     # Generate a new id each time we switch to a new workspace or app id
-    ws_name = replace(trimspace(lower(terraform.workspace)), "-", "")
-    prefix  = replace(trimspace(lower(var.prefix)), "_", "-")
+    ws_name    = replace(trimspace(lower(terraform.workspace)), "_", "-")
+    cluster_id = replace(trimspace(lower(var.prefix)), "_", "-")
   }
 
   length  = max(1, var.randomization_level) // error for zero-length
@@ -113,42 +143,3 @@ resource "azurerm_resource_group" "main" {
   location = var.resource_group_location
 }
 
-resource "azurerm_management_lock" "common_rg" {
-  name       = "osdu_common_rg_lock"
-  scope      = azurerm_resource_group.main.id
-  lock_level = "CanNotDelete"
-}
-
-
-#-------------------------------
-# Container Registry
-#-------------------------------
-module "container_registry" {
-  source = "../../../../modules/providers/azure/container-registry"
-
-  container_registry_name = local.container_registry_name
-  resource_group_name     = azurerm_resource_group.main.name
-
-  container_registry_sku           = var.container_registry_sku
-  container_registry_admin_enabled = false
-}
-
-resource "azurerm_management_lock" "acr_lock" {
-  name       = "osdu_acr_lock"
-  scope      = module.container_registry.container_registry_id
-  lock_level = "CanNotDelete"
-}
-
-
-#-------------------------------
-# Output Variables  (output.tf)
-#-------------------------------
-output "container_registry_id" {
-  description = "The resource identifier of the container registry."
-  value       = module.container_registry.container_registry_id
-}
-
-output "container_registry_name" {
-  description = "The name of the container registry."
-  value       = module.container_registry.container_registry_name
-}
