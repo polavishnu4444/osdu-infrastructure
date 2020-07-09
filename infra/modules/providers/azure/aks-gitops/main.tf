@@ -37,13 +37,14 @@ module "aks" {
   network_policy           = var.network_policy
   network_plugin           = var.network_plugin
   oms_agent_enabled        = var.oms_agent_enabled
+  msi_enabled              = var.msi_enabled
 }
 
 module "flux" {
   source = "../flux"
 
   gitops_ssh_url       = var.gitops_ssh_url
-  gitops_ssh_key       = var.gitops_ssh_key
+  gitops_ssh_key_path  = var.gitops_ssh_key
   gitops_path          = var.gitops_path
   gitops_poll_interval = var.gitops_poll_interval
   gitops_label         = var.gitops_label
@@ -52,7 +53,7 @@ module "flux" {
   flux_recreate        = var.flux_recreate
   kubeconfig_complete  = module.aks.kubeconfig_done
   kubeconfig_filename  = var.kubeconfig_filename
-  flux_clone_dir       = "${var.cluster_name}-flux"
+  flux_clone_dir       = "${var.name}-flux"
   acr_enabled          = var.acr_enabled
   gc_enabled           = var.gc_enabled
 }

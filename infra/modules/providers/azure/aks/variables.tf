@@ -32,14 +32,6 @@ variable "dns_prefix" {
   type = string
 }
 
-variable "service_principal_id" {
-  type = string
-}
-
-variable "service_principal_secret" {
-  type = string
-}
-
 variable "agent_vm_count" {
   type    = string
   default = "2"
@@ -50,9 +42,14 @@ variable "agent_vm_size" {
   default = "Standard_D2s_v3"
 }
 
+variable "max_pods" {
+  type    = string
+  default = 30
+}
+
 variable "kubernetes_version" {
   type    = string
-  default = "1.15.7"
+  default = "1.17.7"
 }
 
 variable "admin_user" {
@@ -121,4 +118,24 @@ variable "oms_agent_enabled" {
   default     = "false"
   description = "Enable Azure Monitoring for AKS"
   type        = string
+}
+
+variable "service_principal_id" {
+  type = string
+  default = ""
+}
+
+variable "service_principal_secret" {
+  type = string
+  default = ""
+}
+
+variable "msi_enabled" {
+  type = bool
+  default = false
+}
+
+variable "enable_kube_dashboard" {
+  type    = bool
+  default = true
 }

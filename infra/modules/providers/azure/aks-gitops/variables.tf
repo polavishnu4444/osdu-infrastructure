@@ -86,18 +86,10 @@ variable "gitops_url_branch" {
 
 variable "kubernetes_version" {
   type    = string
-  default = "1.15.7"
+  default = "1.17.7"
 }
 
 variable "resource_group_name" {
-  type = string
-}
-
-variable "service_principal_id" {
-  type = string
-}
-
-variable "service_principal_secret" {
   type = string
 }
 
@@ -144,4 +136,19 @@ variable "network_policy" {
 variable "oms_agent_enabled" {
   type    = string
   default = "false"
+}
+
+variable "service_principal_id" {
+  type = string
+  default = ""
+}
+
+variable "service_principal_secret" {
+  type = string
+  default = ""
+}
+
+variable "msi_enabled" {
+  type = bool
+  default = false
 }

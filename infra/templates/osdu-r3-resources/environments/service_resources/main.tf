@@ -61,8 +61,10 @@ locals {
 
   tenant_id               = data.azurerm_client_config.current.tenant_id
   resource_group_name     = format("%s-%s-%s-rg", var.prefix, local.workspace, random_string.workspace_scope.result)
+  ai_name                = "${local.base_name}-ai"
+  sb_namespace           = "${local.base_name_21}-bus"
 
-  // keyvault.tf
+  // security.tf
   kv_name                = "${local.base_name_21}-kv"
   ssl_cert_name          = "appgw-ssl-cert"
 
@@ -73,13 +75,10 @@ locals {
   be_subnet_name         = "${local.base_name_21}-be-subnet"
   app_gw_name            = "${local.base_name_60}-gw"
 
-  # aks_cluster_name       = "${local.base_name_21}-aks"
-  # aks_dns_prefix         = local.base_name_60
+  // cluster.tf
+  aks_cluster_name       = "${local.base_name_21}-aks"
+  aks_dns_prefix         = local.base_name_60
 
-  # aks_rg_name            = "${local.base_name_21}-aks-rg"
-  # app_gw_identity_name   = "${local.base_name_21}-app-gw-identity"
-   
-  # app_gw_name            = "${local.base_name_60}-appgw"
   
   # agic_identity_name     = "${local.aks_cluster_name}-agic-identity"
   # pod_identity_name      = "${local.aks_cluster_name}-pod-identity"
@@ -143,3 +142,18 @@ resource "azurerm_resource_group" "main" {
   location = var.resource_group_location
 }
 
+module "app_insights" {
+  source                           = "../../../../modules/providers/azure/app-insights"
+  service_plan_resource_group_name = local.resource_group_name
+  appinsights_name                 = local.ai_name
+  appinsights_application_type     = "other"
+}
+
+## Service Bus
+module "service_bus" {
+  source              = "../../../../modules/providers/azure/service-bus"
+  namespace_name      = local.sb_namespace
+  resource_group_name = local.resource_group_name
+  sku                 = var.sb_sku
+  topics              = var.sb_topics
+}

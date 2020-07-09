@@ -15,19 +15,19 @@
 # URL to get flux which will be installed in the Kubernetes cluster
 variable "flux_repo_url" {
   type    = string
-  default = "https://github.com/weaveworks/flux.git"
+  default = "https://github.com/fluxcd/flux.git"
 }
 
 # container registry to download flux image
 variable "flux_image_repository" {
   type    = string
-  default = "docker.io/weaveworks/flux"
+  default = "docker.io/fluxcd/flux"
 }
 
 # flux version to download source from git repo and container image from the registry
 variable "flux_image_tag" {
   type    = string
-  default = "1.12.2"
+  default = "1.18.0"
 }
 
 variable "gitops_path" {
@@ -68,9 +68,9 @@ variable "gc_enabled" {
 # generate a SSH key named identity: ssh-keygen -q -N "" -f ./identity
 # or use existing ssh public/private key pair
 # add deploy key in gitops repo using public key with read/write access
-# assign/specify private key to "gitops_ssh_key" variable that will be used to cretae kubernetes secret object
+# assign/specify private key to "gitops_ssh_key_path" variable that will be used to cretae kubernetes secret object
 # flux use this key to read manifests in the git repo
-variable "gitops_ssh_key" {
+variable "gitops_ssh_key_path" {
   type = string
 }
 

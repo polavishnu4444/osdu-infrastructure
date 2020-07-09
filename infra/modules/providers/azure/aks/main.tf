@@ -12,6 +12,10 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+locals {
+  msi_identity_type = "SystemAssigned"
+}
+
 data "azurerm_resource_group" "main" {
   name = var.resource_group_name
 }
@@ -69,6 +73,7 @@ resource "azurerm_kubernetes_cluster" "main" {
     vm_size         = var.agent_vm_size
     os_disk_size_gb = 30
     vnet_subnet_id  = var.vnet_subnet_id
+    max_pods        = var.max_pods
   }
 
   network_profile {
@@ -83,15 +88,37 @@ resource "azurerm_kubernetes_cluster" "main" {
     enabled = true
   }
 
-  service_principal {
-    client_id     = var.service_principal_id
-    client_secret = var.service_principal_secret
+  dynamic "service_principal" {
+    for_each = !var.msi_enabled && var.service_principal_id != "" ? [{
+      client_id     = var.service_principal_id
+      client_secret = var.service_principal_secret
+    }] : []
+    content {
+      client_id     = service_principal.value.client_id
+      client_secret = service_principal.value.client_secret
+    }
+  }
+
+  # This dynamic block enables managed service identity for the cluster
+  # in the case that the following holds true:
+  #   1: the msi_enabled input variable is set to true
+  dynamic "identity" {
+    for_each = var.msi_enabled ? [local.msi_identity_type] : []
+    content {
+      type = identity.value
+    }
   }
 
   addon_profile {
     oms_agent {
       enabled                    = var.oms_agent_enabled
       log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+    }
+
+    # adding this as a patch to disable azurerm provider from redeploying due to unset
+    # internal "optional value".  To be removed when azurerm provider is fixed.
+    kube_dashboard {
+      enabled = var.enable_kube_dashboard
     }
   }
 }

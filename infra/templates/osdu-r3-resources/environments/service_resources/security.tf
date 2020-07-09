@@ -18,10 +18,10 @@ locals {
     # aad-client-id = module.ad_application.id
 
     # App Insights Secrets
-    # appinsights-key = module.app_insights.app_insights_instrumentation_key
+    appinsights-key = module.app_insights.app_insights_instrumentation_key
 
     # Service Bus Namespace Secrets
-    # sb-connection = module.service_bus.service_bus_namespace_default_connection_string
+    sb-connection = module.service_bus.service_bus_namespace_default_connection_string
 
     # Elastic Search Cluster Secrets
     # elastic-endpoint = var.elasticsearch_endpoint

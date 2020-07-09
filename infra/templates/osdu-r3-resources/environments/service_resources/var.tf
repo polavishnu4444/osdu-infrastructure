@@ -49,10 +49,6 @@ variable "resource_group_location" {
   type        = string
 }
 
-###
-# Begin: AKS configuration
-###
-
 variable "ssl_certificate_file" {
   type        = string
   description = "(Required) The x509-based SSL certificate used to setup ssl termination on the app gateway."
@@ -87,4 +83,129 @@ variable "subnet_be_prefix" {
   description = "The address prefix to use for the backend subnet."
   type        = string
   default     = "10.10.3.0/28"
+}
+
+variable "sb_sku" {
+  type        = string
+  default     = "Standard"
+  description = "The SKU of the namespace. The options are: `Basic`, `Standard`, `Premium`."
+}
+
+variable "sb_topics" {
+  type = list(object({
+    name                         = string
+    default_message_ttl          = string //ISO 8601 format
+    enable_partitioning          = bool
+    requires_duplicate_detection = bool
+    support_ordering             = bool
+    authorization_rules = list(object({
+      policy_name = string
+      claims      = object({ listen = bool, manage = bool, send = bool })
+
+    }))
+    subscriptions = list(object({
+      name                                 = string
+      max_delivery_count                   = number
+      lock_duration                        = string //ISO 8601 format
+      forward_to                           = string //set with the topic name that will be used for forwarding. Otherwise, set to ""
+      dead_lettering_on_message_expiration = bool
+      filter_type                          = string // SqlFilter is the only supported type now.
+      sql_filter                           = string //Required when filter_type is set to SqlFilter
+      action                               = string
+    }))
+  }))
+  default = [
+    {
+      name                         = "storage_topic"
+      default_message_ttl          = "PT30M" //ISO 8601 format
+      enable_partitioning          = true
+      requires_duplicate_detection = true
+      support_ordering             = true
+      authorization_rules = [
+        {
+          policy_name = "storage_policy"
+          claims = {
+            listen = true
+            send   = false
+            manage = false
+          }
+        }
+      ]
+      subscriptions = [
+        {
+          name                                 = "storage_sub_1"
+          max_delivery_count                   = 1
+          lock_duration                        = "PT5M" //ISO 8601 format
+          forward_to                           = ""     //set with the topic name that will be used for forwarding. Otherwise, set to ""
+          dead_lettering_on_message_expiration = true
+          filter_type                          = "SqlFilter"     // SqlFilter is the only supported type now.
+          sql_filter                           = "color = 'red'" //Required when filter_type is set to SqlFilter
+          action                               = ""
+        },
+        {
+          name                                 = "storage_sub_2"
+          max_delivery_count                   = 1
+          lock_duration                        = "PT5M" //ISO 8601 format
+          forward_to                           = ""     //set with the topic name that will be used for forwarding. Otherwise, set to ""
+          dead_lettering_on_message_expiration = true
+          filter_type                          = "SqlFilter"      // SqlFilter is the only supported type now.
+          sql_filter                           = "color = 'blue'" //Required when filter_type is set to SqlFilter
+          action                               = ""
+        }
+      ]
+    }
+  ]
+}
+
+variable "aks_agent_vm_count" {
+  description = "The initial number of agent pools / nodes allocated to the AKS cluster"
+  type        = string
+  default     = "3"
+}
+
+variable "aks_agent_vm_size" {
+  type        = string
+  description = "The size of each VM in the Agent Pool (e.g. Standard_F1). Changing this forces a new resource to be created."
+  default     = "Standard_D2s_v3"
+}
+
+variable "kubernetes_version" {
+  type    = string
+  default = "1.17.7"
+}
+
+variable "flux_recreate" {
+  description = "Make any change to this value to trigger the recreation of the flux execution script."
+  type        = string
+  default     = "false"
+}
+
+variable "ssh_public_key_file" {
+  type        = string
+  description = "(Required) The SSH public key used to setup log-in credentials on the nodes in the AKS cluster."
+}
+
+variable "gitops_ssh_url" {
+  type        = string
+  description = "(Required) ssh git clone repository URL with Kubernetes manifests including services which runs in the cluster. Flux monitors this repo for Kubernetes manifest additions/changes periodically and apply them in the cluster."
+}
+
+variable "gitops_ssh_key_file" {
+  type        = string
+  description = "(Required) SSH key used to establish a connection to a private git repo containing the HLD manifest."
+}
+
+variable "gitops_config" {
+  type = object({
+    branch = string
+    path = string
+    label = string
+    interval = string
+  })
+  default = {
+    branch = "master"
+    path = "providers/azure/hld-registry"
+    label = "flux-sync"
+    interval = "10s"
+  }
 }
