@@ -27,10 +27,10 @@ Auth design [specification](docs/auth.md).
 
 ## Resource Topology
 
-![Resource Topology](./docs/images/deployment_topology.png "Resource Topology")
+![Resource Topology](./docs/images/deployment_topology.jpg "Resource Topology")
 
 ## Terraform Template Topology
-![Template Topology](docs/design/images/template_topology.jpg "Template Topology")
+![Template Topology](docs/images/template_topology.jpg "Template Topology")
 
 ## Intended audience
 
