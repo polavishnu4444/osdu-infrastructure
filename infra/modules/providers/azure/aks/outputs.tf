@@ -16,6 +16,10 @@ output "id" {
   value = azurerm_kubernetes_cluster.main.id
 }
 
+output "name" {
+  value = azurerm_kubernetes_cluster.main.name
+}
+
 output "client_certificate" {
   sensitive = true
   value     = azurerm_kubernetes_cluster.main.kube_config.0.client_certificate
@@ -26,6 +30,32 @@ output "kube_config" {
   value     = azurerm_kubernetes_cluster.main.kube_config_raw
 }
 
+output "kube_config_block" {
+  sensitive = true
+  value     = azurerm_kubernetes_cluster.main.kube_config
+}
+
 output "kubeconfig_done" {
   value = join("", local_file.cluster_credentials.*.id)
+}
+
+## Depends upon MSI
+output "msi_client_id" {
+  value = data.external.msi_object_id.result.msi_client_id
+}
+
+output "kubelet_client_id" {
+  value = data.external.msi_object_id.result.kubelet_client_id
+}
+
+output "kubelet_id" {
+  value = data.external.msi_object_id.result.kubelet_id
+}
+
+output "node_resource_group" {
+  value = data.external.msi_object_id.result.node_resource_group
+}
+
+output "kubelet_resource_id" {
+  value = data.external.msi_object_id.result.kubelet_resource_id
 }

@@ -22,10 +22,10 @@ terraform {
 
 
 #-------------------------------
-# Providers
+# Providers  (main.tf)
 #-------------------------------
 provider "azurerm" {
-  version = "~> 2.8.0"
+  version = "~> 2.18.0"
   features {}
 }
 
@@ -92,13 +92,24 @@ locals {
   # helm_agic_ns           = "agic"
   # helm_agic_name         = "agic"
   # helm_pod_identity_name = "aad-pod-identity"
+
+  secrets_map = {
+    # Imported Secrets from State
+    cosmos-endpoint    = data.terraform_remote_state.data_resources.outputs.cosmosdb_properties.cosmosdb.endpoint
+    cosmos-primary-key = data.terraform_remote_state.data_resources.outputs.cosmosdb_properties.cosmosdb.primary_master_key
+    cosmos-connection  = data.terraform_remote_state.data_resources.outputs.cosmosdb_properties.cosmosdb.connection_strings[0]
+    storage-account-key = data.terraform_remote_state.data_resources.outputs.storage_properties.primary_access_key
+
+    # Secrets from this template
+    appinsights-key = module.app_insights.app_insights_instrumentation_key
+    sb-connection = module.service_bus.service_bus_namespace_default_connection_string
+  }
 }
 
 
 #-------------------------------
 # Common Resources  (common.tf)
 #-------------------------------
-
 data "azurerm_client_config" "current" {}
 
 data "terraform_remote_state" "data_resources" {
@@ -135,25 +146,183 @@ resource "random_string" "workspace_scope" {
 
 
 #-------------------------------
-# Resource Group
+# Resource Group (main.tf)
 #-------------------------------
-resource "azurerm_resource_group" "main" {
+module "resource_group" {
+  source   = "../../../../modules/providers/azure/resource-group"
+
   name     = local.resource_group_name
   location = var.resource_group_location
 }
 
+
+#-------------------------------
+# Application Insights (main.tf)
+#-------------------------------
 module "app_insights" {
   source                           = "../../../../modules/providers/azure/app-insights"
-  service_plan_resource_group_name = local.resource_group_name
+
   appinsights_name                 = local.ai_name
+  service_plan_resource_group_name = module.resource_group.name
+  
   appinsights_application_type     = "other"
 }
 
-## Service Bus
+
+#-------------------------------
+# Azure Service Bus (main.tf)
+#-------------------------------
 module "service_bus" {
   source              = "../../../../modules/providers/azure/service-bus"
+
   namespace_name      = local.sb_namespace
-  resource_group_name = local.resource_group_name
+  resource_group_name = module.resource_group.name
+
   sku                 = var.sb_sku
   topics              = var.sb_topics
+}
+
+
+#-------------------------------
+# Network (main.tf)
+#-------------------------------
+module "network" {
+  source              = "../../../../modules/providers/azure/network"
+
+  name                = local.vnet_name
+  resource_group_name = module.resource_group.name
+  address_space       = var.address_space
+  dns_servers         = ["8.8.8.8"]
+  subnet_prefixes     = [var.subnet_fe_prefix, var.subnet_aks_prefix, var.subnet_be_prefix]
+  subnet_names        = [local.fe_subnet_name, local.aks_subnet_name, local.be_subnet_name]
+}
+
+module "appgateway" {
+  source              = "../../../../modules/providers/azure/aks-appgw"
+
+  name                 = local.app_gw_name
+  resource_group_name  = module.resource_group.name
+  vnet_name            = module.network.name
+  vnet_subnet_id       = module.network.subnets.0
+  keyvault_id          = module.keyvault.keyvault_id
+  keyvault_secret_id   = azurerm_key_vault_certificate.default.0.secret_id  # TODO: If not default then import
+  ssl_certificate_name = local.ssl_cert_name
+}
+
+
+#-------------------------------
+# Key Vault  (security.tf)
+#-------------------------------
+module "keyvault" {
+  source              = "../../../../modules/providers/azure/keyvault"
+
+  keyvault_name       = local.kv_name
+  resource_group_name = module.resource_group.name
+}
+
+# Default Certificate Install.
+resource "azurerm_key_vault_certificate" "default" {
+  count = var.ssl_certificate_file == "" ? 1 : 0
+
+  name         = local.ssl_cert_name
+  key_vault_id = module.keyvault.keyvault_id
+
+  certificate_policy {
+    issuer_parameters {
+      name = "Self"
+    }
+
+    key_properties {
+      exportable = true
+      key_size   = 2048
+      key_type   = "RSA"
+      reuse_key  = true
+    }
+
+    lifetime_action {
+      action {
+        action_type = "AutoRenew"
+      }
+
+      trigger {
+        days_before_expiry = 30
+      }
+    }
+
+    secret_properties {
+      content_type = "application/x-pkcs12"
+    }
+
+    x509_certificate_properties {
+      # Server Authentication = 1.3.6.1.5.5.7.3.1
+      # Client Authentication = 1.3.6.1.5.5.7.3.2
+      extended_key_usage = ["1.3.6.1.5.5.7.3.1"]
+
+      key_usage = [
+        "cRLSign",
+        "dataEncipherment",
+        "digitalSignature",
+        "keyAgreement",
+        "keyCertSign",
+        "keyEncipherment",
+      ]
+
+      subject_alternative_names {
+        dns_names = [var.dns_name, "${local.base_name}-gw.${module.resource_group.location}.cloudapp.azure.com"]
+      }
+
+      subject            = "CN=*.contoso.com"
+      validity_in_months = 12
+    }
+  }
+}
+
+// Secrets Load from things created in this template.
+// When this module runs depends upon the secrets loaded.
+module "keyvault_secrets" {
+  source      = "../../../../modules/providers/azure/keyvault-secret"
+  keyvault_id = module.keyvault.keyvault_id
+  secrets     = local.secrets_map
+}
+
+
+
+#-------------------------------
+# Key Vault  (cluster.tf)
+#-------------------------------
+module "aks-gitops" {
+  source = "../../../../modules/providers/azure/aks-gitops"
+
+  name                 = local.aks_cluster_name
+  resource_group_name  = local.resource_group_name
+  dns_prefix           = local.aks_dns_prefix
+  agent_vm_count       = var.aks_agent_vm_count
+  agent_vm_size        = var.aks_agent_vm_size
+  vnet_subnet_id       = module.network.subnets.1
+  ssh_public_key       = file(var.ssh_public_key_file)
+  kubernetes_version   = var.kubernetes_version
+
+  flux_recreate        = var.flux_recreate
+  acr_enabled          = true
+  gc_enabled           = true
+  msi_enabled          = true
+  oms_agent_enabled    = true
+  
+  gitops_ssh_url       = var.gitops_ssh_url
+  gitops_ssh_key       = var.gitops_ssh_key_file
+  gitops_url_branch    = var.gitops_config.branch
+  gitops_path          = var.gitops_config.path
+  gitops_poll_interval = var.gitops_config.interval
+  gitops_label         = var.gitops_config.label
+}
+
+provider "kubernetes" {
+  version                = "~> 1.11.3"
+  load_config_file       = false
+  host                   = module.aks-gitops.kube_config.0.host
+  username               = module.aks-gitops.kube_config.0.username
+  password               = module.aks-gitops.kube_config.0.password
+  client_certificate     = base64decode(module.aks-gitops.kube_config.0.client_certificate)
+  client_key             = base64decode(module.aks-gitops.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(module.aks-gitops.kube_config.0.cluster_ca_certificate)
 }

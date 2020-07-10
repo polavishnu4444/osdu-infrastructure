@@ -20,6 +20,8 @@ data "azurerm_resource_group" "main" {
   name = var.resource_group_name
 }
 
+data "azurerm_subscription" "current" {}
+
 resource "random_id" "main" {
   keepers = {
     group_name = data.azurerm_resource_group.main.name
@@ -121,4 +123,14 @@ resource "azurerm_kubernetes_cluster" "main" {
       enabled = var.enable_kube_dashboard
     }
   }
+}
+
+data "external" "msi_object_id" {
+  depends_on = [azurerm_kubernetes_cluster.main]
+  program = [
+    "${path.module}/msi_client_id_query.sh",
+    var.name,
+    data.azurerm_resource_group.main.name,
+    data.azurerm_subscription.current.subscription_id
+  ]
 }

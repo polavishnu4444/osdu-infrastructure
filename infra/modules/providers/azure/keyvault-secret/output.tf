@@ -12,10 +12,23 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-output "keyvault_secret_attributes" {
-  description = "The properties of a keyvault secret"
-  /*Forced to use data block and resolve output of secrets into an array 
-  as a workaround to an arm provider bug that will not allow updating app
-  service settings with a keyvault version in a more direct way.*/
-  value = [for i in range(length(azurerm_key_vault_secret.secret.*.id)) : data.azurerm_key_vault_secret.secrets[i]]
+# output "keyvault_secret_attributes" {
+#   description = "The properties of a keyvault secret"
+#   /*Forced to use data block and resolve output of secrets into an array 
+#   as a workaround to an arm provider bug that will not allow updating app
+#   service settings with a keyvault version in a more direct way.*/
+#   value = [for i in range(length(azurerm_key_vault_secret.secret.*.id)) : data.azurerm_key_vault_secret.secrets[i]]
+# }
+
+output "secrets" {
+  value       = { for k, v in azurerm_key_vault_secret.main : v.name => v.id }
+  description = "A mapping of secret names and URIs."
+}
+
+output "references" {
+  value = {
+    for k, v in azurerm_key_vault_secret.main :
+    v.name => format("@Microsoft.KeyVault(SecretUri=%s)", v.id)
+  }
+  description = "A mapping of Key Vault references for App Service and Azure Functions."
 }
